@@ -1,0 +1,48 @@
+library(shiny)
+library(shinydashboard)
+library(DBI)
+library(pool)
+library(dplyr) 
+library(RMySQL)
+library(ggplot2)
+
+pool <- dbPool(
+  drv = RMySQL::MySQL(),
+  dbname = "bibliometrics",
+  host = "localhost",
+  username = "luke",
+  password = "K8H,3Cuq]?HzG*W7"
+)
+
+onStop(function(){
+  poolClose(pool)
+})
+
+server <- function(input, output,session) {
+  
+  output$menu <- renderMenu({
+    sidebarMenu(
+      menuItem("Graphing", tabName="m1", icon = icon("database")),
+      menuItem("Author Search", tabName="m2", icon = icon("database")),
+      menuItem("Records Search", tabName="m3", icon = icon("database"))
+    )
+  })
+  
+  isolate({updateTabItems(session, "tabs", "m2")})
+  
+  output$auth <- renderTable({
+      sql <- paste0("Select distinct(author), link from citations where author like '%",input$ID,"%';")
+      query <- sqlInterpolate(pool, sql, id = input$ID)
+      print(input$ID)
+      dbGetQuery(pool, query)
+      
+  })
+  output$records <- renderTable({
+    sql <- paste0("Select * from citations where link = '",input$link,"';")
+    query <- sqlInterpolate(pool, sql, id = input$ID)
+    print(input$ID)
+    dbGetQuery(pool, query)
+    
+  })
+  
+}

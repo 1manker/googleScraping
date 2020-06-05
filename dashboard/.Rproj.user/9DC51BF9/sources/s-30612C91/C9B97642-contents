@@ -1,0 +1,22 @@
+library(shiny)
+library(shinydashboard)
+
+ui <- dashboardPage(
+  dashboardHeader(title = "Display"),
+  dashboardSidebar(
+    sidebarMenu(id="tabs",
+                sidebarMenuOutput("menu")
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "m1"),
+      tabItem(tabName = "m2",
+              textInput("ID", "Enter author link:", "Zhang"),
+              tableOutput("auth")),
+      tabItem(tabName = "m3",
+              textInput("link", "Enter author link"),
+              tableOutput("records"))
+    )
+  )
+)

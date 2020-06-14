@@ -21,22 +21,24 @@ onStop(function(){
 })
 
 getHindex <- function(df, max, min, authList){
-  ds <- data.frame(hindex = integer())
-  xs <- c(1:nrow(df))
-  for(x in xs){
-    query <- paste0("select distinct(title), sum(count) from citations where", 
-                    " author = '", df[x,1],"' and year <=", df[x,2]," group by title;")
+  ws <- data.frame(hindex = integer())
+  for (auths in authList){
+    query <- paste0("select link from profiles where author = '", auths, "'")
     dbFrame <- dbGetQuery(pool, query)
-    hindex <- 1
-    while(TRUE){
-      vals <- sum(dbFrame$"sum(count)" > hindex)
-      if(vals < hindex) break
-      hindex = 1 + hindex
+    link <- (unlist(dbFrame[1,]))
+    query <- paste0("select h_index, year from metrics where profile = '", link, "'")
+    dbFrame <- dbGetQuery(pool, query)
+    author <- rep(auths, nrow(dbFrame))
+    dbFrame <- cbind(dbFrame, author)
+    if(nrow(ws)==0){
+      ws <- dbFrame
     }
-    ds <- rbind(ds,hindex=(hindex))
+    else{
+      ws <- rbind(ws, dbFrame)
+    }
   }
-  names(ds)[1]<- "hindex"
-  return(ds)
+  colnames(ws)[1] <- "hindex"
+  return(ws)
 }
 
 ranges <- reactiveValues(x = NULL, y = NULL)
@@ -154,8 +156,17 @@ server <- function(input, output, session) {
         }
         else if(input$Cumulative == FALSE && input$Yearly == FALSE && input$hindex == TRUE){
           dataset <- getHindex(df, input$rangeG[1], input$rangeG[2], input$qNames)
-          culmH <- cbind(df, dataset)
+          #culmH <- cbind(df, dataset)
+          print(class(df$author))
+          i <- sapply(dataset, is.factor)
+          dataset[i] <- lapply(dataset[i], as.character)
+          print(class(dataset$author))
+          df$pub_date <- as.numeric(as.character(df$pub_date))
+          culmH <- dplyr::left_join(dataset, df, by=c("year" = "pub_date", "author" = "author"))
+          culmH[is.na(culmH)] <- 0
+          colnames(culmH)[2] <- "pub_date"
           df <- culmH
+          print(df)
         }
         else if(input$Cumulative == FALSE && input$Yearly == FALSE && input$hindex == FALSE){
           return()
@@ -175,6 +186,7 @@ server <- function(input, output, session) {
             xd <- dplyr::filter(culmH, !grepl("(cumulative)",author))
             if(input$hindex == TRUE){
               xd <- dplyr::filter(culmH, !grepl("(cumulative)",author))
+              print(xd)
               p2 <- ggplot(data = xd, aes(x = xd$pub_date, y = xd$"hindex", 
                                           fill = author)) + 
                 geom_bar(stat="identity", position = position_dodge()) +

@@ -6,6 +6,7 @@ library(dplyr)
 library(RMySQL)
 library(ggplot2)
 library(patchwork)
+library(pryr)
 
 
 pool <- dbPool(
@@ -15,6 +16,8 @@ pool <- dbPool(
   username = "luke",
   password = "K8H,3Cuq]?HzG*W7"
 )
+
+names <- NULL
 
 onStop(function() {
   poolClose(pool)
@@ -47,8 +50,35 @@ getHindex <- function(df, max, min, authList) {
 
 ranges <- reactiveValues(x = NULL, y = NULL)
 
+init <- function(var){
+  names <<- c(names, var)
+  names <- unique(names)
+  cat(paste(names, collapse=", "))
+}
+
+clearNames <- function(){
+  print(names)
+  names <<- NULL
+  names
+}
 
 server <- function(input, output, session) {
+  
+  observeEvent(input$clear,{
+    names <- clearNames()
+    output$authOut <- renderPrint({
+      cat("")
+    })
+  })
+  
+  observeEvent(input$submit,{
+    newNames <- input$qNames
+    output$authOut <- renderPrint({
+      init(newNames)
+    })
+  })
+  
+
   observeEvent(input$popDubs, {
     brush <- input$popBrush
     if (!is.null(brush)) {
@@ -91,8 +121,7 @@ server <- function(input, output, session) {
     x <- getNames(input$authG, input)
     y <- c()
     updateSelectInput(session, "qNames", c = (x))
-    
-    
+
   })
   
   plotInput <- function() {

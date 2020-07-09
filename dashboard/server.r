@@ -137,7 +137,7 @@ server <- function(input, output, session) {
         qString,
         " FROM citations",
         " WHERE author='",
-        (input$qNames)[1],
+        names[1],
         "' and pub_date > ",
         as.integer(input$rangeG)[1],
         " and pub_date < ",
@@ -154,7 +154,7 @@ server <- function(input, output, session) {
       cFrame[x, "author"] <-
         paste0(cFrame[x, "author"], "(cumulative)")
     }
-    for (x in tail(input$qNames, -1)) {
+    for (x in tail(names, -1)) {
       query <-
         paste0(
           "SELECT author,pub_date, ",
@@ -183,7 +183,7 @@ server <- function(input, output, session) {
     }
     if (input$Cumulative == TRUE && input$Yearly == TRUE) {
       dataset <-
-        getHindex(df, input$rangeG[1], input$rangeG[2], input$qNames)
+        getHindex(df, input$rangeG[1], input$rangeG[2], names)
       i <- sapply(dataset, is.factor)
       dataset[i] <- lapply(dataset[i], as.character)
       df$pub_date <- as.numeric(as.character(df$pub_date))
@@ -195,7 +195,7 @@ server <- function(input, output, session) {
     }
     else if (input$Cumulative == TRUE && input$Yearly == FALSE) {
       dataset <-
-        getHindex(df, input$rangeG[1], input$rangeG[2], input$qNames)
+        getHindex(df, input$rangeG[1], input$rangeG[2], names)
       i <- sapply(dataset, is.factor)
       dataset[i] <- lapply(dataset[i], as.character)
       df$pub_date <- as.numeric(as.character(df$pub_date))
@@ -207,7 +207,7 @@ server <- function(input, output, session) {
     }
     else if (input$Cumulative == FALSE && input$Yearly == TRUE) {
       dataset <-
-        getHindex(df, input$rangeG[1], input$rangeG[2], input$qNames)
+        getHindex(df, input$rangeG[1], input$rangeG[2], names)
       i <- sapply(dataset, is.factor)
       dataset[i] <- lapply(dataset[i], as.character)
       df$pub_date <- as.numeric(as.character(df$pub_date))
@@ -219,7 +219,7 @@ server <- function(input, output, session) {
     else if (input$Cumulative == FALSE &&
              input$Yearly == FALSE && input$hindex == TRUE) {
       dataset <-
-        getHindex(df, input$rangeG[1], input$rangeG[2], input$qNames)
+        getHindex(df, input$rangeG[1], input$rangeG[2], names)
       i <- sapply(dataset, is.factor)
       dataset[i] <- lapply(dataset[i], as.character)
       df$pub_date <- as.numeric(as.character(df$pub_date))
@@ -375,39 +375,44 @@ server <- function(input, output, session) {
     }
   }
   
-  plotLine <- function(df, culM) {
-    
-  }
-  
   observe({
-    str <- paste0("'", input$qNames[1], "'")
-    for (x in input$qNames) {
-      if (x != input$qNames[1]) {
-        str <- paste0(str, "or author =", "'", x, "'")
+    
+    updateRanges <- function()({
+      str <- paste0("'", names, "'")
+      print(names)
+      for (x in names) {
+        if (x != names[1]) {
+          str <- paste0(str, "or author =", "'", x, "'")
+        }
       }
-    }
-    query <-
-      paste0("Select min(pub_date), max(pub_date) from citations where author=",
-             str
-             ,
-             ";")
-    df <- dbGetQuery(pool, query)
-    updateSliderInput(
-      session,
-      "rangeG",
-      min = df$"min(pub_date)",
-      max = df$"max(pub_date)",
-      value = c(min, max)
-    )
-    if (length(input$qNames) > 0) {
+      query <-
+        paste0("Select min(pub_date), max(pub_date) from citations where author=",
+               str
+               ,
+               ";")
+      print(query)
+      df <- dbGetQuery(pool, query)
+      updateSliderInput(
+        session,
+        "rangeG",
+        min = df$"min(pub_date)",
+        max = df$"max(pub_date)",
+        value = c(min, max)
+      )
+    })
+    observeEvent(input$graph,{
       output$popPlot <- renderPlot({
-        plotInput()
+        if(length(names > 0)){
+          updateRanges()
+          plotInput()
+        }
       })
-    }
+    })
     output$downloadD <- downloadHandler(
       filename = 'export.png',
       content = function(file) {
-        ggsave(file, plot = plotInput())
+        ggsave(file, plot = plotInput() + theme_bw(base_size = 10),
+        width = 20, height = 4, dpi = 300, units = "in", device='png')
       }
     )
   })

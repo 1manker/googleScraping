@@ -8,7 +8,7 @@ library(ggplot2)
 library(patchwork)
 library(pryr)
 
-
+#get the database connection through the dns
 pool <- dbPool(
   drv = RMySQL::MySQL(),
   dbname = "bibliometrics",
@@ -17,19 +17,28 @@ pool <- dbPool(
   password = "K8H,3Cuq]?HzG*W7"
 )
 
+#a global variable used to get around observer objects constantly changing
 names <- NULL
 
+#make sure to close connections when the program exits
 onStop(function() {
   poolClose(pool)
 })
 
+#This function is just a query to get the H-index values from the database and 
+#combines them with the citation dataframe.
 getHindex <- function(df, max, min, authList) {
+  #It takes the dataframe which has the citation metrics, the ranges, and the 
+  #list to query.
   ws <- data.frame(hindex = integer())
+  #initializes and empty frame and tells it to expect integers.
   for (auths in authList) {
+    #going through all the authors it was supplied to query.
     query <-
       paste0("select link from profiles where author = '", auths, "'")
     dbFrame <- dbGetQuery(pool, query)
     link <- (unlist(dbFrame[1,]))
+    #grabs the links from the profiles table to search the h-index table.
     query <-
       paste0("select h_index, i_ten, year, g_index from metrics where profile = '",
              link,
@@ -37,33 +46,72 @@ getHindex <- function(df, max, min, authList) {
     dbFrame <- dbGetQuery(pool, query)
     author <- rep(auths, nrow(dbFrame))
     dbFrame <- cbind(dbFrame, author)
+    #searches the metrics table with the profile links supplied by the profile table.
     if (nrow(ws) == 0) {
       ws <- dbFrame
+      #if this is the first entry, then fill the blank dataframe.
     }
     else{
       ws <- rbind(ws, dbFrame)
+      #else, keep adding to the dataframe
     }
   }
   colnames(ws)[1] <- "hindex"
+  #format the frame correctly for graphing
   return(ws)
 }
 
+#queries the database and searches for strings in the search box
+getNames <- function(name, input) {
+  argL <- unlist(strsplit(input$authG[1], ","))
+  #format the list to be searched correctly
+  sql <-
+    paste0(
+      "Select distinct(author), link from citations where",
+      " author like '%",
+      (argL)[1],
+      "%';"
+    )
+  query <- sqlInterpolate(pool, sql, id = input$ID)
+  dbFrame1 <- dbGetQuery(pool, query)
+  #once again, this first search populates the vector, then keeps searching
+  #through the following loop.
+  for (i in argL) {
+    sql <- paste0("Select distinct(author), link from citations where",
+                  " author like '%",
+                  i,
+                  "%';")
+    query <- sqlInterpolate(pool, sql, id = input$ID)
+    dbFrame <- dbGetQuery(pool, query)
+    dbFrame1 <- rbind(dbFrame, dbFrame1)
+  }
+  #keep adding names to populate list
+  v <- as.vector(dbFrame1$author)
+  return(v)
+}
+
+#initialize some reactive ranges for graphing and queries
 ranges <- reactiveValues(x = NULL, y = NULL)
 
+#function used to change the global variable names, this is done because
+#r's observer objects really, really don't like to make deep copies
 init <- function(var){
   names <<- c(names, var)
   names <- unique(names)
   cat(paste(names, collapse=", "))
 }
 
+#empty out the global variable when the clear button is pressed.
 clearNames <- function(){
   print(names)
   names <<- NULL
   names
 }
 
+#the actual server function which handles all rendering
 server <- function(input, output, session) {
   
+  #clear button, dump the names vector
   observeEvent(input$clear,{
     names <- clearNames()
     output$authOut <- renderPrint({
@@ -71,6 +119,7 @@ server <- function(input, output, session) {
     })
   })
   
+  #the add button, adds names to the names vector
   observeEvent(input$submit,{
     newNames <- input$qNames
     output$authOut <- renderPrint({
@@ -78,7 +127,8 @@ server <- function(input, output, session) {
     })
   })
   
-
+  #zoom function, drag a box around the graph, double click to zoom, double 
+  #click again to go back
   observeEvent(input$popDubs, {
     brush <- input$popBrush
     if (!is.null(brush)) {
@@ -91,32 +141,7 @@ server <- function(input, output, session) {
     }
   })
   
-  
-  #gets names for graphing function
-  getNames <- function(name, input) {
-    argL <- unlist(strsplit(input$authG[1], ","))
-    sql <-
-      paste0(
-        "Select distinct(author), link from citations where",
-        " author like '%",
-        (argL)[1],
-        "%';"
-      )
-    query <- sqlInterpolate(pool, sql, id = input$ID)
-    dbFrame1 <- dbGetQuery(pool, query)
-    for (i in argL) {
-      sql <- paste0("Select distinct(author), link from citations where",
-                    " author like '%",
-                    i,
-                    "%';")
-      query <- sqlInterpolate(pool, sql, id = input$ID)
-      dbFrame <- dbGetQuery(pool, query)
-      dbFrame1 <- rbind(dbFrame, dbFrame1)
-    }
-    v <- as.vector(dbFrame1$author)
-    return(v)
-  }
-  
+  #the search box, reactively adds names from what is typed
   observe({
     x <- getNames(input$authG, input)
     y <- c()
@@ -124,7 +149,11 @@ server <- function(input, output, session) {
 
   })
   
+  #the massive plotinput function.
+  #this needs to be condensed, A LOT, but it figures out what to query, then graphs.
   plotInput <- function() {
+    #checking for what string to add to the query, either looking for citation
+    #information or publication information.
     if (input$radioGT == "pubs") {
       qString <- "count(distinct title)"
     }
@@ -147,6 +176,7 @@ server <- function(input, output, session) {
     df <- dbGetQuery(pool, query)
     cFrame <- df[order(df$pub_date),]
     cumulative <- 0
+    #again, first query is the first name, then it iterates through rest of tail
     for (x in 1:nrow(cFrame)) {
       ex <- cFrame[x, qString]
       cumulative <- cumulative + ex
@@ -171,6 +201,7 @@ server <- function(input, output, session) {
       df2 <- dbGetQuery(pool, query)
       cFrame2 <- df2[order(df2$pub_date),]
       cumulative2 <- 0
+      #a frame for cumulative metrics is pre-loaded
       for (x in 1:nrow(cFrame2)) {
         ex2 <- cFrame2[x, qString]
         cumulative2 <- cumulative2 + ex2
@@ -181,6 +212,8 @@ server <- function(input, output, session) {
       cFrame <- rbind(cFrame, cFrame2)
       df <- rbind(df, df2)
     }
+    #these logical checks figure out what to add to the data frame.
+    #there's a lot of repetitive copy pasting, and could use a lot of work.
     if (input$Cumulative == TRUE && input$Yearly == TRUE) {
       dataset <-
         getHindex(df, input$rangeG[1], input$rangeG[2], names)
@@ -233,6 +266,8 @@ server <- function(input, output, session) {
              input$Yearly == FALSE && input$hindex == FALSE) {
       return()
     }
+    #all the plotting functions, using logical states to decide which graph
+    #to display
     if (input$radioG == "Histogram") {
       if (input$radioGT == "pubs") {
         p1 <-
@@ -376,7 +411,7 @@ server <- function(input, output, session) {
   }
   
   observe({
-    
+    #queries database and updates ranges.
     updateRanges <- function()({
       str <- paste0("'", names, "'")
       print(names)
@@ -400,6 +435,9 @@ server <- function(input, output, session) {
         value = c(min, max)
       )
     })
+    
+    #Graph button.  If anything is in the authout box it plots input given the
+    #graphing selections.
     observeEvent(input$graph,{
       output$popPlot <- renderPlot({
         if(length(names > 0)){
@@ -408,6 +446,8 @@ server <- function(input, output, session) {
         }
       })
     })
+    
+    #export button, saves a png of the graph
     output$downloadD <- downloadHandler(
       filename = 'export.png',
       content = function(file) {
@@ -417,6 +457,7 @@ server <- function(input, output, session) {
     )
   })
   
+  #the left hand menu
   output$menu <- renderMenu({
     sidebarMenu(
       menuItem(
@@ -441,6 +482,7 @@ server <- function(input, output, session) {
     updateTabItems(session, "tabs", "m1")
   })
   
+  #simple author search for links
   output$auth <- renderTable({
     #author list for search
     sql <-
@@ -451,6 +493,8 @@ server <- function(input, output, session) {
     dbGetQuery(pool, query)
     
   })
+  
+  #basically shows what the database has in a condensed manner
   getRecords <- function() {
     if (input$qType == "All Entries") {
       sql <- paste0(
@@ -504,9 +548,13 @@ server <- function(input, output, session) {
       max = df$"max(pub_date)",
       value = c(min, max)
     )
+    
+    #actual rendering of the table
     output$records <- renderTable({
       getRecords()
     })
+    
+    #export button for the table data
     output$downloadData <- downloadHandler(
       filename = function() {
         paste(input$link, ".csv", sep = "")

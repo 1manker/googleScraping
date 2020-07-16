@@ -108,6 +108,31 @@ clearNames <- function(){
   names
 }
 
+getFrame <- function(){
+  qString <- ''
+  cString <- ''
+  for (x in names){
+    qString <- paste0(qString, " citations.author='", x,"'", " or")
+    cString <- paste0(cString, " author='", x, "'", " or")
+  }
+  qString <- gsub('.{3}$', '', qString)
+  cString <- gsub('.{3}$', '', cString)
+  sql <- paste0("select distinct metrics.year, citations.author, metrics.h_index,
+                metrics.i_ten, metrics.g_index from metrics inner join citations
+                on metrics.profile=citations.link where ", qString, 
+                "order by citations.author asc, metrics.year asc;")
+  query <- sqlInterpolate(pool, sql)
+  dbFrame <- dbGetQuery(pool, query)
+  sqlCit <- paste0("select author, sum(count), year from citations where",
+                    cString,
+                    "group by author, year;")
+  citQuery <- sqlInterpolate(pool, sqlCit)
+  citFrame <- dbGetQuery(pool, citQuery)
+  retFrame <- merge(dbFrame, citFrame, by=c("author", "year"))
+  names(retFrame)[names(retFrame) == "sum(count)"] <- "Citation Count"
+  retFrame
+}
+
 #the actual server function which handles all rendering
 server <- function(input, output, session) {
   
@@ -126,6 +151,15 @@ server <- function(input, output, session) {
       init(newNames)
     })
   })
+  
+  output$downloadFrame <- downloadHandler(
+    filename = function() {
+      paste("export.csv", ".csv", sep = "")
+    },
+    content = function(file) {
+      write.csv(getFrame(), file, row.names = FALSE)
+    }
+  )
   
   #zoom function, drag a box around the graph, double click to zoom, double 
   #click again to go back

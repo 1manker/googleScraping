@@ -68,11 +68,12 @@ ui <- dashboardPage(
               ))),
       #second tab to search for google scholar links
       tabItem(tabName = "m2",
-              textInput("ID", "Enter author link:", "Zhang"),
-              tableOutput("auth")),
+              selectInput("queueFilter", "Filter", c("Completed", "In Progress", "Queued", "Errors")),
+              tableOutput("queueTable")),
       tabItem(tabName = "m3",
               #third tab which shows basically what's in the database
-              textInput("link", "Enter author link", "01GFu9cAAAAJ"),
+              textInput("link", "Search Author Name", "Bengio"),
+              selectInput("m3Author", "Select Author", c(NULL)),
               radioButtons("qType", "Select the Query Type", c("All Entries", "Individual Papers")),
               #another reactive slider range
               sliderInput("rangeR",label="Date Range" ,min=1970, max=2021, 

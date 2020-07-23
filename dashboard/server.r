@@ -25,6 +25,39 @@ onStop(function() {
   poolClose(pool)
 })
 
+#This function queries the queue and lists what's left to be queried.
+
+getQueue <- function(searchString){
+  query <-
+    paste0(searchString)
+  dbFrame <- dbGetQuery(pool, query)
+  dbFrame
+}
+
+updateRanges <- function(session)({
+  str <- paste0("'", names, "'")
+  print(names)
+  for (x in names) {
+    if (x != names[1]) {
+      str <- paste0(str, "or author =", "'", x, "'")
+    }
+  }
+  query <-
+    paste0("Select min(pub_date), max(pub_date) from citations where author=",
+           str
+           ,
+           ";")
+  print(query)
+  df <- dbGetQuery(pool, query)
+  updateSliderInput(
+    session,
+    "rangeG",
+    min = df$"min(pub_date)",
+    max = df$"max(pub_date)",
+    value = c(min, max)
+  )
+})
+
 #This function is just a query to get the H-index values from the database and 
 #combines them with the citation dataframe.
 getHindex <- function(df, max, min, authList) {
@@ -41,8 +74,7 @@ getHindex <- function(df, max, min, authList) {
     #grabs the links from the profiles table to search the h-index table.
     query <-
       paste0("select h_index, i_ten, year, g_index from metrics where profile = '",
-             link,
-             "'")
+             link,"' and year < ", min, " and year > ", max)
     dbFrame <- dbGetQuery(pool, query)
     author <- rep(auths, nrow(dbFrame))
     dbFrame <- cbind(dbFrame, author)
@@ -63,7 +95,7 @@ getHindex <- function(df, max, min, authList) {
 
 #queries the database and searches for strings in the search box
 getNames <- function(name, input) {
-  argL <- unlist(strsplit(input$authG[1], ","))
+  argL <- unlist(strsplit(name[1], ","))
   #format the list to be searched correctly
   sql <-
     paste0(
@@ -445,37 +477,12 @@ server <- function(input, output, session) {
   }
   
   observe({
-    #queries database and updates ranges.
-    updateRanges <- function()({
-      str <- paste0("'", names, "'")
-      print(names)
-      for (x in names) {
-        if (x != names[1]) {
-          str <- paste0(str, "or author =", "'", x, "'")
-        }
-      }
-      query <-
-        paste0("Select min(pub_date), max(pub_date) from citations where author=",
-               str
-               ,
-               ";")
-      print(query)
-      df <- dbGetQuery(pool, query)
-      updateSliderInput(
-        session,
-        "rangeG",
-        min = df$"min(pub_date)",
-        max = df$"max(pub_date)",
-        value = c(min, max)
-      )
-    })
-    
     #Graph button.  If anything is in the authout box it plots input given the
     #graphing selections.
     observeEvent(input$graph,{
+      updateRanges(session)
       output$popPlot <- renderPlot({
         if(length(names > 0)){
-          updateRanges()
           plotInput()
         }
       })
@@ -500,7 +507,7 @@ server <- function(input, output, session) {
         icon = icon("database")
       ),
       menuItem(
-        "Author Search",
+        "Queue Status",
         tabName = "m2",
         icon = icon("database")
       ),
@@ -516,15 +523,24 @@ server <- function(input, output, session) {
     updateTabItems(session, "tabs", "m1")
   })
   
-  #simple author search for links
-  output$auth <- renderTable({
-    #author list for search
-    sql <-
-      paste0("Select distinct(author), link from citations where author like '%",
-             input$ID,
-             "%';")
-    query <- sqlInterpolate(pool, sql, id = input$ID)
-    dbGetQuery(pool, query)
+  #Queue Status Display
+  #Four possibilities:
+  #Completed, Not completed, Errors, In Progress
+  output$queueTable <- renderTable({
+    searchString <- "select author, link from profiles where"
+    if(input$queueFilter == "Completed"){
+      searchString <- paste0(searchString, " search_date IS NOT NULL")
+    }
+    else if(input$queueFilter == "Queued"){
+      searchString <- paste0(searchString, " search_date IS NULL and queue_status = 0")
+    }
+    else if(input$queueFilter == "Errors"){
+      searchString <- paste0(searchString, " err_flag=1")
+    }
+    else if(input$queueFilter == "In Progress"){
+      searchString <- paste0(searchString, " search_date IS NULL and queue_status = 1")
+    }
+    getQueue(searchString)
     
   })
   
@@ -533,7 +549,7 @@ server <- function(input, output, session) {
     if (input$qType == "All Entries") {
       sql <- paste0(
         "Select title, author, description, pub_date, year ",
-        "from citations where link = ?id",
+        "from citations where author = ?id",
         " and pub_date > ",
         as.integer(input$rangeR)[1],
         " and pub_date < ",
@@ -542,7 +558,7 @@ server <- function(input, output, session) {
         as.integer(input$maxR),
         ";"
       )
-      query <- sqlInterpolate(pool, sql, id = input$link)
+      query <- sqlInterpolate(pool, sql, id = input$m3Author)
       df <- dbGetQuery(pool, query)
       return(df)
     }
@@ -550,7 +566,7 @@ server <- function(input, output, session) {
       sql <-
         paste0(
           "Select distinct(title), author, description, pub_date ",
-          "from citations where link = ?id",
+          "from citations where author = ?id",
           " and pub_date > ",
           as.integer(input$rangeR)[1],
           " and pub_date < ",
@@ -560,18 +576,24 @@ server <- function(input, output, session) {
           as.integer(input$maxR),
           ";"
         )
-      query <- sqlInterpolate(pool, sql, id = input$link)
+      query <- sqlInterpolate(pool, sql, id = input$m3Author)
       df <- dbGetQuery(pool, query)
       return(df)
     }
   }
+  observe({
+    x <- getNames(input$link, input)
+    y <- c()
+    updateSelectInput(session, "m3Author", c = (x))
+    
+  })
   #updating records table
   observe({
     ex <- data.frame()
     query <-
       paste0(
-        "select min(pub_date), max(pub_date) from citations where link='",
-        input$link,
+        "select min(pub_date), max(pub_date) from citations where author='",
+        input$m3Author,
         "';"
       )
     df <- dbGetQuery(pool, query)

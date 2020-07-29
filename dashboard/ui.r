@@ -74,6 +74,12 @@ ui <- dashboardPage(
               #third tab which shows basically what's in the database
               textInput("link", "Search Author Name", "Bengio"),
               selectInput("m3Author", "Select Author", c(NULL)),
+              textInput("gSearch", "Author not found? Search Google and add to queue."),
+              fluidRow(
+              div(style = "display: inline-block;vertical-align:top;padding-left:15px;padding-bottom:10px",
+                actionButton("gSearchButton", "Search Google"),
+                actionButton("addToQueueButton", "Add to Queue")
+              )),
               radioButtons("qType", "Select the Query Type", c("All Entries", "Individual Papers")),
               #another reactive slider range
               sliderInput("rangeR",label="Date Range" ,min=1970, max=2021, 

@@ -7,6 +7,9 @@ library(RMySQL)
 library(ggplot2)
 library(patchwork)
 library(pryr)
+library(reticulate)
+
+source_python('authorSearch.py')
 
 #get the database connection through the dns
 pool <- dbPool(
@@ -16,6 +19,13 @@ pool <- dbPool(
   username = "luke",
   password = "K8H,3Cuq]?HzG*W7"
 )
+
+cumulativeTransform <- function(x){
+  for(i in 2:length(x)){
+    x[i] <- x[i] + x[i-1]
+  }
+  x
+}
 
 #a global variable used to get around observer objects constantly changing
 names <- NULL
@@ -36,7 +46,6 @@ getQueue <- function(searchString){
 
 updateRanges <- function(session)({
   str <- paste0("'", names, "'")
-  print(names)
   for (x in names) {
     if (x != names[1]) {
       str <- paste0(str, "or author =", "'", x, "'")
@@ -47,7 +56,6 @@ updateRanges <- function(session)({
            str
            ,
            ";")
-  print(query)
   df <- dbGetQuery(pool, query)
   updateSliderInput(
     session,
@@ -135,7 +143,6 @@ init <- function(var){
 
 #empty out the global variable when the clear button is pressed.
 clearNames <- function(){
-  print(names)
   names <<- NULL
   names
 }
@@ -164,6 +171,7 @@ getFrame <- function(){
   names(retFrame)[names(retFrame) == "sum(count)"] <- "Citation Count"
   retFrame
 }
+
 
 #the actual server function which handles all rendering
 server <- function(input, output, session) {
@@ -346,7 +354,6 @@ server <- function(input, output, session) {
           geom_bar(stat = "identity", position = position_dodge()) +
           coord_cartesian(xlim = ranges$x, ylim = ranges$y) +
           ggtitle("Publications") +
-          scale_y_continuous(name = "Publications") +
           labs(x = "Date"+scale_x_continuous(labels = NULL))
         xd <- dplyr::filter(culmH, !grepl("(cumulative)", author))
         if (input$hindex == TRUE) {
@@ -367,11 +374,12 @@ server <- function(input, output, session) {
             p1 + p2
           }
           else{
-            p2
+            p2 
           }
         }
         else{
-          p1
+          print(cumulativeTransform(df$"count(distinct title)"))
+          p1 + scale_y_continuous("Miles/gallon", sec.axis = sec_axis(cumsum(~.), name = "ex"))
         }
       }
       else if (input$radioGT == "cit") {
@@ -587,6 +595,14 @@ server <- function(input, output, session) {
     updateSelectInput(session, "m3Author", c = (x))
     
   })
+  
+  observeEvent(input$gSearchButton, {
+    strex <- search(input$gSearch)
+    output$records <- renderTable({
+      strex
+    })
+  })
+  
   #updating records table
   observe({
     ex <- data.frame()
@@ -609,6 +625,7 @@ server <- function(input, output, session) {
     output$records <- renderTable({
       getRecords()
     })
+    
     
     #export button for the table data
     output$downloadData <- downloadHandler(

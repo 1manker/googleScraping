@@ -599,7 +599,7 @@ server <- function(input, output, session) {
   observeEvent(input$gSearchButton, {
     strex <- search(input$gSearch)
     output$records <- renderTable({
-      strex
+      head(strex, input$maxR)
     })
   })
   

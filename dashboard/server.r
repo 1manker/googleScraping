@@ -8,6 +8,7 @@ library(ggplot2)
 library(patchwork)
 library(pryr)
 library(reticulate)
+library(DT)
 
 source_python('authorSearch.py')
 
@@ -29,6 +30,8 @@ cumulativeTransform <- function(x){
 
 #a global variable used to get around observer objects constantly changing
 names <- NULL
+
+links <- NULL
 
 #make sure to close connections when the program exits
 onStop(function() {
@@ -145,6 +148,15 @@ init <- function(var){
 clearNames <- function(){
   names <<- NULL
   names
+}
+
+initLinks <- function(var){
+  links <<- c(links, var)
+}
+
+clearLinks <- function(){
+  links <<- NULL
+  links
 }
 
 getFrame <- function(){
@@ -534,7 +546,7 @@ server <- function(input, output, session) {
   #Queue Status Display
   #Four possibilities:
   #Completed, Not completed, Errors, In Progress
-  output$queueTable <- renderTable({
+  output$queueTable <- renderDataTable({
     searchString <- "select author, link from profiles where"
     if(input$queueFilter == "Completed"){
       searchString <- paste0(searchString, " search_date IS NOT NULL")
@@ -597,10 +609,33 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$gSearchButton, {
+    clearLinks()
     strex <- search(input$gSearch)
-    output$records <- renderTable({
-      head(strex, input$maxR)
+    authorStrex <- vector(mode = "list", length = length(strex))
+    instStrex <- vector(mode = "list", length = length(strex))
+    linkStrex <- vector(mode = "list", length = length(strex))
+    index <- 1
+    for(x in strex){
+      authorStrex[index] <- x[1]
+      instStrex[index] <- x[2]
+      linkStrex[index] <- x[3]
+      index <- index + 1
+    }
+    initLinks(linkStrex)
+    retTable <- do.call(rbind, Map(data.frame, Author = authorStrex, Institution = instStrex, "Profile Link" = linkStrex))
+    output$records <- renderDataTable({
+      head(retTable, input$maxR)
     })
+  })
+  
+  observeEvent(input$addToQueueButton, {
+    indices <- input$records_rows_selected
+    for(x in indices){
+      insertClause <- paste0("insert into profiles (link, queue_status) ",
+                             "select '",links[x],"', 0 where not exists(select * from profiles where link = '",
+                             links[x],"');")
+      df <- dbGetQuery(pool, insertClause)
+    }
   })
   
   #updating records table
@@ -622,7 +657,7 @@ server <- function(input, output, session) {
     )
     
     #actual rendering of the table
-    output$records <- renderTable({
+    output$records <- renderDataTable({
       getRecords()
     })
     

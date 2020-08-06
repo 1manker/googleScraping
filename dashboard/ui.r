@@ -1,5 +1,6 @@
 library(shiny)
 library(shinydashboard)
+library(DT)
 
 ui <- dashboardPage(
   dashboardHeader(title = "Display"),
@@ -69,7 +70,7 @@ ui <- dashboardPage(
       #second tab to search for google scholar links
       tabItem(tabName = "m2",
               selectInput("queueFilter", "Filter", c("Completed", "In Progress", "Queued", "Errors")),
-              tableOutput("queueTable")),
+              dataTableOutput("queueTable")),
       tabItem(tabName = "m3",
               #third tab which shows basically what's in the database
               textInput("link", "Search Author Name", "Bengio"),
@@ -88,7 +89,7 @@ ui <- dashboardPage(
                           value=5, sep=""),
               downloadButton("downloadData", "Export"),
               #export in csv format
-              tableOutput("records"))
+              dataTableOutput("records"))
       #the actual table output
               
     )

@@ -22,7 +22,8 @@ def search(author):
 		author_bulk = soup.find_all('h3', attrs={"class": "gs_ai_name"})
 		description_bulk = soup.find_all('div', attrs={"class": "gs_ai_aff"})
 		for x, y in zip(author_bulk, description_bulk):
-			ret.append(x.getText() + " : " + y.getText())
+			link = x.find('a')['href'].split("=")
+			ret.append([x.getText(),y.getText(),link[2]])
 		if len(driver.find_elements_by_xpath("/html/body/div/div[8]/div[2]/div/div[11]/div/button[2]")) != 0:
 			driver.find_element_by_xpath("/html/body/div/div[8]/div[2]/div/div[11]/div/button[2]").click()
 			time.sleep(1)
@@ -30,4 +31,3 @@ def search(author):
 			break    
 
 	return ret
-

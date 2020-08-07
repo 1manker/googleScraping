@@ -16,7 +16,7 @@ source_python('authorSearch.py')
 pool <- dbPool(
   drv = RMySQL::MySQL(),
   dbname = "bibliometrics",
-  host = "localhost",
+  host = "192.168.1.145",
   username = "luke",
   password = "K8H,3Cuq]?HzG*W7"
 )
@@ -609,21 +609,30 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$gSearchButton, {
-    clearLinks()
-    strex <- search(input$gSearch)
-    authorStrex <- vector(mode = "list", length = length(strex))
-    instStrex <- vector(mode = "list", length = length(strex))
-    linkStrex <- vector(mode = "list", length = length(strex))
-    index <- 1
-    for(x in strex){
-      authorStrex[index] <- x[1]
-      instStrex[index] <- x[2]
-      linkStrex[index] <- x[3]
-      index <- index + 1
-    }
-    initLinks(linkStrex)
-    retTable <- do.call(rbind, Map(data.frame, Author = authorStrex, Institution = instStrex, "Profile Link" = linkStrex))
     output$records <- renderDataTable({
+      progress <- Progress$new(session, min=1, max=10)
+      on.exit(progress$close())
+
+      progress$set(message = 'Scraping From Google Scholar',
+                  detail = '')
+      clearLinks()
+      progress$set(value=3)
+      strex <- search(input$gSearch)
+      progress$set(value=7)
+      authorStrex <- vector(mode = "list", length = length(strex))
+      instStrex <- vector(mode = "list", length = length(strex))
+      linkStrex <- vector(mode = "list", length = length(strex))
+      index <- 1
+      for(x in strex){
+        authorStrex[index] <- x[1]
+        instStrex[index] <- x[2]
+        linkStrex[index] <- x[3]
+        index <- index + 1
+      }
+      initLinks(linkStrex)
+      retTable <- do.call(rbind, Map(data.frame, Author = authorStrex, 
+                        Institution = instStrex, "Profile Link" = linkStrex))
+      progress$set(value=9)
       head(retTable, input$maxR)
     })
   })

@@ -9,10 +9,12 @@ def search(author):
 	url = "https://scholar.google.com/citations?view_op=search_authors&hl=en&mauthors=" + author.replace(' ', '+')
 	print(url)
 	global options
-	options = webdriver.ChromeOptions()
-	options.add_argument('headless')
+	options = Options()
+	options.add_argument('--headless')
+	options.add_argument('--no-sandbox')
+	options.add_argument('--disable-dev-shm-usage')
 	global driver
-	DRIVER_PATH = 'C:/ProgramData/chocolatey/lib/chromedriver/tools/chromedriver'
+	DRIVER_PATH = '/usr/local/bin/chromedriver'
 	driver = webdriver.Chrome(executable_path=DRIVER_PATH, chrome_options=options)
 	driver.implicitly_wait(30)
 	driver.get(url)

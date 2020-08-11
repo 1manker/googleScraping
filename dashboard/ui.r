@@ -74,8 +74,11 @@ ui <- dashboardPage(
       tabItem(tabName = "m3",
               #third tab which shows basically what's in the database
               textInput("link", "Search Author Name", "Bengio"),
-              selectInput("m3Author", "Select Author", c(NULL)),
-              textInput("gSearch", "Author not found? Search Google and add to queue."),
+              fluidRow(
+              div(style = "display: inline-block;vertical-align:top;padding-left:15px;padding-bottom:10px",
+                selectInput("m3Author", "Select Author", c(NULL)),
+                textOutput("errMsg")
+              )),
               fluidRow(
               div(style = "display: inline-block;vertical-align:top;padding-left:15px;padding-bottom:10px",
                 actionButton("gSearchButton", "Search Google"),
@@ -85,11 +88,10 @@ ui <- dashboardPage(
               #another reactive slider range
               sliderInput("rangeR",label="Date Range" ,min=1970, max=2021, 
                           value=c(2014,2021),sep=""),
-              sliderInput("maxR",label="Maximum Entries", min=5, max=50,
-                          value=5, sep=""),
               downloadButton("downloadData", "Export"),
               #export in csv format
-              dataTableOutput("records"))
+              dataTableOutput("records"),
+              dataTableOutput("googleSearch"))
       #the actual table output
               
     )

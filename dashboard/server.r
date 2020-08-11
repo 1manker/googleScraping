@@ -592,8 +592,6 @@ server <- function(input, output, session) {
           " and pub_date < ",
           as.integer(input$rangeR)[2],
           " group by pub_date",
-          " limit ",
-          as.integer(input$maxR),
           ";"
         )
       query <- sqlInterpolate(pool, sql, id = input$m3Author)
@@ -634,6 +632,7 @@ server <- function(input, output, session) {
   })
   
   scrapeGoogle <- eventReactive(input$gSearchButton,{
+      shinyjs::show("scrape")
       progress <- Progress$new(session, min=1, max=10)
       on.exit(progress$close())
 
@@ -662,30 +661,19 @@ server <- function(input, output, session) {
 
 
   observeEvent(input$addToQueueButton, {
-    output$recordsd <- renderDataTable({
-      if(length(input$records_rows_selected) < 1){
+      if(length(input$scrape_rows_selected) < 1){
         showNotification("No Selected Profiles")
-        datatable(getRecords(), selection='none')
       }
       else{
-        indices <- input$records_rows_selected
-        progress <- Progress$new(session, min=1, max=length(indices))
-        progTick <- 1
-        on.exit(progress$close())
-
-        progress$set(message = 'Adding Selected Profiles to Queue...',
-                    detail = '')
-        for(x in indices){
-          progress$set(value=progTick)
-          insertClause <- paste0("insert into profiles (link, queue_status) ",
-                                "select '",links[x],"', 0 where not exists(select * from profiles where link = '",
-                                links[x],"');")
-          df <- dbGetQuery(pool, insertClause)
-          progTick <- progTick + 1
-          naptime(lubridate::seconds(1))
-        }
+          indices <- input$scrape_rows_selected
+          for(x in indices){
+            insertClause <- paste0("insert into profiles (link, queue_status) ",
+                                    "select '",links[x],"', 0 where not exists(select * from profiles where link = '",
+                                    links[x],"');")
+            df <- dbGetQuery(pool, insertClause)
+            showNotification(paste0("Added ", links[x], " to queue."))
+          }
       }
-    })
   })
   
   #updating records table

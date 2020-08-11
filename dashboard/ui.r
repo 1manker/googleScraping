@@ -4,6 +4,7 @@ library(DT)
 library(shinyjs)
 
 ui <- dashboardPage(
+
   dashboardHeader(title = "Display"),
   dashboardSidebar(
     sidebarMenu(id="tabs",
@@ -11,6 +12,7 @@ ui <- dashboardPage(
     )
   ),
   dashboardBody(
+    includeCSS("www/styles.css"),
     tabItems(
       #graphing tab
       tabItem(tabName = "m1",
@@ -79,7 +81,8 @@ ui <- dashboardPage(
               fluidRow(
               div(style = "display: inline-block;vertical-align:top;padding-left:15px;padding-bottom:10px",
                 selectInput("m3Author", "Select Author", c(NULL)),
-                textOutput("errMsg")
+                div(class = "errMsg",
+                  textOutput("errMsg"))
               )),
               fluidRow(
               div(style = "display: inline-block;vertical-align:top;padding-left:15px;padding-bottom:10px",

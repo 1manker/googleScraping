@@ -10,6 +10,7 @@ library(pryr)
 library(reticulate)
 library(DT)
 library(naptime)
+library(shinyjs)
 
 source_python('authorSearch.py')
 
@@ -620,10 +621,19 @@ server <- function(input, output, session) {
     datatable(getRecords(), selection='none')
   })
 
+  output$scrape <- renderDataTable({
+    scrapeGoogle()
+  })
+
+  observeEvent(input$clearSearch,{
+    shinyjs::hide("scrape")
+  })
 
   observeEvent(input$gSearchButton, {
-    search <- TRUE
-    output$googleSeach <- renderDataTable({
+    shinyjs::show("scrape")
+  })
+  
+  scrapeGoogle <- eventReactive(input$gSearchButton,{
       progress <- Progress$new(session, min=1, max=10)
       on.exit(progress$close())
 
@@ -648,11 +658,11 @@ server <- function(input, output, session) {
                         Institution = instStrex, "Profile Link" = linkStrex))
       progress$set(value=9)
       retTable
-    })
   })
-  
+
+
   observeEvent(input$addToQueueButton, {
-    output$records <- renderDataTable({
+    output$recordsd <- renderDataTable({
       if(length(input$records_rows_selected) < 1){
         showNotification("No Selected Profiles")
         datatable(getRecords(), selection='none')

@@ -1,6 +1,7 @@
 library(shiny)
 library(shinydashboard)
 library(DT)
+library(shinyjs)
 
 ui <- dashboardPage(
   dashboardHeader(title = "Display"),
@@ -72,6 +73,7 @@ ui <- dashboardPage(
               selectInput("queueFilter", "Filter", c("Completed", "In Progress", "Queued", "Errors")),
               dataTableOutput("queueTable")),
       tabItem(tabName = "m3",
+              useShinyjs(),
               #third tab which shows basically what's in the database
               textInput("link", "Search Author Name", "Bengio"),
               fluidRow(
@@ -82,6 +84,7 @@ ui <- dashboardPage(
               fluidRow(
               div(style = "display: inline-block;vertical-align:top;padding-left:15px;padding-bottom:10px",
                 actionButton("gSearchButton", "Search Google"),
+                actionButton("clearSearch", "Clear Search"),
                 actionButton("addToQueueButton", "Add to Queue")
               )),
               radioButtons("qType", "Select the Query Type", c("All Entries", "Individual Papers")),
@@ -90,8 +93,8 @@ ui <- dashboardPage(
                           value=c(2014,2021),sep=""),
               downloadButton("downloadData", "Export"),
               #export in csv format
-              dataTableOutput("records"),
-              dataTableOutput("googleSearch"))
+              dataTableOutput("scrape"),
+              dataTableOutput("records"))
       #the actual table output
               
     )

@@ -75,6 +75,7 @@ ui <- dashboardPage(
               selectInput("queueFilter", "Filter", c("Completed", "In Progress", "Queued", "Errors")),
               dataTableOutput("queueTable")),
       tabItem(tabName = "m3",
+              tags$style('#errMsg {background-color:#ECF0F5}'),
               useShinyjs(),
               #third tab which shows basically what's in the database
               textInput("link", "Search Author Name", "Bengio"),
@@ -90,7 +91,7 @@ ui <- dashboardPage(
                 actionButton("clearSearch", "Clear Search"),
                 actionButton("addToQueueButton", "Add to Queue")
               )),
-              radioButtons("qType", "Select the Query Type", c("All Entries", "Individual Papers")),
+              radioButtons("qType", "Select the Query Type", c("Individual Papers", "All Entries")),
               #another reactive slider range
               sliderInput("rangeR",label="Date Range" ,min=1970, max=2021, 
                           value=c(2014,2021),sep=""),

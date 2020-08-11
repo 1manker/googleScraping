@@ -1,4 +1,4 @@
 .errMsg {
-    background-color: black;
     color: red;
+    background: rgba(0, 151, 19, 0.3) !important;
 }
